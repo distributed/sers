@@ -5,6 +5,18 @@ import (
 	"io"
 )
 
+const (
+	N = 0 // no parity
+	E = 1 // even parity
+	O = 2 // odd parity
+)
+
+const (
+	NO_HANDSHAKE = 0
+	RTSCTS_HANDSHAKE = 1
+	)
+
+
 type SerialPort interface {
 	io.Reader
 	io.Writer
