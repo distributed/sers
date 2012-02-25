@@ -99,6 +99,76 @@ func (bp *baseport) SetBaudRate(br int) error {
 	return nil
 }
 
+func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int) error {
+	if baudrate <= 0 {
+		return &ParameterError{"baudrate", "has to be > 0"}
+	}
+
+	var datamask uint
+	switch databits {
+	case 5: datamask = C.CS5
+	case 6: datamask = C.CS6
+	case 7: datamask = C.CS7
+	case 8: datamask = C.CS8
+	default:
+		return &ParameterError{"databits", "has to be 5, 6, 7 or 8"}
+	}
+
+
+	if stopbits != 1 && stopbits != 2 {
+		return &ParameterError{"stopbits", "has to be 1 or 2"}
+	}
+	var stopmask uint
+	if stopbits == 2 {
+		stopmask = C.CSTOPB
+	}
+
+	var parmask uint
+	switch parity {
+	case N: parmask = 0
+	case E: parmask = C.PARENB
+	case O: parmask = C.PARENB | C.PARODD
+	default:
+		return &ParameterError{"parity", "has to be N, E or O"}
+	}
+	
+	var flowmask uint
+	switch handshake {
+	case NO_HANDSHAKE: flowmask = 0
+	case RTSCTS_HANDSHAKE: flowmask = C.CRTSCTS
+	default:
+		return &ParameterError{"handshake", "has to be NO_HANDSHAKE or RTSCTS_HANDSHAKE"}
+	}
+	
+	tio, err := bp.getattr()
+	if err != nil {
+		return err
+	}
+
+	tio.c_cflag &^= C.CSIZE
+	tio.c_cflag |= C.tcflag_t(datamask)
+
+	tio.c_cflag &^= C.PARENB | C.PARODD
+	tio.c_cflag |= C.tcflag_t(parmask)
+
+	tio.c_cflag &^= C.CSTOPB
+	tio.c_cflag |= C.tcflag_t(stopmask)
+
+	tio.c_cflag &^= C.CCTS_OFLOW | C.CRTSCTS | C.CRTS_IFLOW
+	tio.c_cflag |= C.tcflag_t(flowmask)
+
+	
+	if err := bp.setattr(tio); err != nil {
+		return err
+	}
+
+	if err := bp.SetBaudRate(baudrate); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func Open(fn string) (SerialPort, error) {
 	// the order of system calls is taken from Apple's SerialPortSample
 	// open the TTY device read/write, nonblocking, i.e. not waiting
