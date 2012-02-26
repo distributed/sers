@@ -22,6 +22,7 @@ type SerialPort interface {
 	io.Writer
 	io.Closer
 	SetMode(baudrate, databits, parity, stopbits, handshake int) error
+	SetReadParams(minread int, timeout float64) error
 }
 
 type StringError string

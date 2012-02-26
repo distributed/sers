@@ -169,6 +169,37 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	return nil
 }
 
+func (bp *baseport) SetReadParams(minread int, timeout float64) error {
+	inttimeout := int(timeout * 10)
+	if inttimeout < 0 {
+		return &ParameterError{"timeout", "needs to be 0 or higher"}
+	}
+	// if a timeout is desired but too small for the termios timeout
+	// granularity, set the minimum timeout
+	if timeout > 0 && inttimeout == 0 {
+		inttimeout = 1 
+	}
+
+
+	tio, err := bp.getattr()
+	if err != nil {
+		return err
+	}
+
+	
+	tio.c_cc[C.VMIN] = C.cc_t(minread)
+	tio.c_cc[C.VTIME] = C.cc_t(inttimeout)
+
+	fmt.Printf("baud rates from termios: %d, %d\n", tio.c_ispeed, tio.c_ospeed)
+
+	err = bp.setattr(tio)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func Open(fn string) (SerialPort, error) {
 	// the order of system calls is taken from Apple's SerialPortSample
 	// open the TTY device read/write, nonblocking, i.e. not waiting
