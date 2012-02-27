@@ -12,10 +12,9 @@ const (
 )
 
 const (
-	NO_HANDSHAKE = 0
+	NO_HANDSHAKE     = 0
 	RTSCTS_HANDSHAKE = 1
-	)
-
+)
 
 type SerialPort interface {
 	io.Reader
