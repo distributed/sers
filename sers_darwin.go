@@ -14,15 +14,14 @@ package sers
 import "C"
 
 import (
-	"fmt"
 	"unsafe"
 )
 
 func (bp *baseport) SetBaudRate(br int) error {
 	var speed C.speed_t = C.speed_t(br)
 
-	fmt.Printf("C.IOSSIOSPEED %x\n", uint64(C.IOSSIOSPEED))
-	fmt.Printf("for file %v, fd %d\n", bp.f, bp.f.Fd())
+	//fmt.Printf("C.IOSSIOSPEED %x\n", uint64(C.IOSSIOSPEED))
+	//fmt.Printf("for file %v, fd %d\n", bp.f, bp.f.Fd())
 
 	ret, err := C.ioctl1(C.int(bp.f.Fd()), C.uint(IOSSIOSPEED), unsafe.Pointer(&speed))
 	if ret == -1 || err != nil {

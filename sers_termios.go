@@ -12,7 +12,6 @@ package sers
 import "C"
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 	"unsafe"
@@ -177,7 +176,7 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 	tio.c_cc[C.VMIN] = C.cc_t(minread)
 	tio.c_cc[C.VTIME] = C.cc_t(inttimeout)
 
-	fmt.Printf("baud rates from termios: %d, %d\n", tio.c_ispeed, tio.c_ospeed)
+	//fmt.Printf("baud rates from termios: %d, %d\n", tio.c_ispeed, tio.c_ospeed)
 
 	err = bp.setattr(tio)
 	if err != nil {
