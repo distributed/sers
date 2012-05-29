@@ -1,5 +1,7 @@
 package sers
 
+import "C"
+
 import (
 	"fmt"
 	"io"
