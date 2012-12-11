@@ -5,7 +5,7 @@ package sers
 // taken from https://github.com/tarm/goserial
 // and slightly modified
 
-// (C) 2011, 2012 Tarmigan Casebolt, Benjamin Sieger, Michael Meier
+// (C) 2011, 2012 Tarmigan Casebolt, Benjamin Siegert, Michael Meier
 
 import (
 	"fmt"
