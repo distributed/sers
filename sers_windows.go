@@ -1,4 +1,5 @@
 // +build windows
+
 package sers
 
 // taken from https://github.com/tarm/goserial

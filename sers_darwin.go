@@ -1,6 +1,6 @@
 // +build darwin
-package sers
 
+package sers
 
 /*#include <sys/ioctl.h>
 #include <IOKit/serial/ioss.h> 
@@ -36,6 +36,6 @@ func (bp *baseport) ClearNonBlocking() error {
 	if res < 0 || err != nil {
 		return err
 	}
-	
+
 	return nil
 }

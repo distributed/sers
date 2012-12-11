@@ -1,4 +1,5 @@
 // +build darwin linux
+
 package sers
 
 /*#include <stddef.h>

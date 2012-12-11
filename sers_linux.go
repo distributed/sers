@@ -1,4 +1,5 @@
 // +build linux
+
 package sers
 
 /*
@@ -8,7 +9,6 @@ package sers
  extern int clearnonblocking(int fd);
 */
 import "C"
-
 
 func (bp *baseport) SetBaudRate(br int) error {
 	// setting aliased baud rate
