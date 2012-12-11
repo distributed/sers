@@ -3,10 +3,12 @@
 package sers
 
 // taken from https://github.com/tarm/goserial
+// and slightly modified
+
+// (C) 2011, 2012 Tarmigan Casebolt, Benjamin Sieger, Michael Meier
 
 import (
 	"fmt"
-//	"io" // TODO
 	"os"
 	"sync"
 	"syscall"
@@ -68,7 +70,7 @@ func Open(name string) (rwc SerialPort, err error) {
 	if err = setupComm(h, 64, 64); err != nil {
 		return
 	}
-	if err = setCommTimeouts(h); err != nil {
+	if err = setCommTimeouts(h, 0.0); err != nil {
 		return
 	}
 	if err = setCommMask(h); err != nil {
@@ -105,13 +107,17 @@ func (p *serialPort) Write(buf []byte) (int, error) {
 	}
 	var n uint32
 	err := syscall.WriteFile(p.fd, buf, &n, p.wo)
+	//fmt.Printf("n %d  err %v\n", n, err)
+	_ = fmt.Printf
 	if err != nil && err != syscall.ERROR_IO_PENDING {
+		//fmt.Printf("returning...\n")
 		return int(n), err
 	}
 	return getOverlappedResult(p.fd, p.wo)
 }
 
 func (p *serialPort) Read(buf []byte) (int, error) {
+	//fmt.Printf("read(<%d bytes>)\n", len(buf))
 	if p == nil || p.f == nil {
 		return 0, fmt.Errorf("Invalid port on read %v %v", p, p.f)
 	}
@@ -123,11 +129,20 @@ func (p *serialPort) Read(buf []byte) (int, error) {
 		return 0, err
 	}
 	var done uint32
+	//fmt.Printf("calling ReadFile... ")
 	err := syscall.ReadFile(p.fd, buf, &done, p.ro)
+	//fmt.Printf(" done. %d, %v\n", done, err)
 	if err != nil && err != syscall.ERROR_IO_PENDING {
 		return int(done), err
 	}
-	return getOverlappedResult(p.fd, p.ro)
+
+	//fmt.Printf("getting OverlappedResult... ")
+	n, err := getOverlappedResult(p.fd, p.ro)
+	//fmt.Printf(" done. n %d err %v\n", n, err)
+	if n == 0 && err == nil {
+		return n, winSersTimeout{}
+	}
+	return n, err
 }
 
 var (
@@ -197,7 +212,6 @@ func setCommState(h syscall.Handle, baud, databits, parity, handshake int) error
 		return StringError("only NO_HANDSHAKE is supported on windows")
 	}
 
-
 	r, _, err := syscall.Syscall(nSetCommState, 2, uintptr(h), uintptr(unsafe.Pointer(&params)), 0)
 	if r == 0 {
 		return err
@@ -205,12 +219,17 @@ func setCommState(h syscall.Handle, baud, databits, parity, handshake int) error
 	return nil
 }
 
-func setCommTimeouts(h syscall.Handle) error {
+func setCommTimeouts(h syscall.Handle, constTimeout float64) error {
 	var timeouts structTimeouts
 	const MAXDWORD = 1<<32 - 1
 	timeouts.ReadIntervalTimeout = MAXDWORD
 	timeouts.ReadTotalTimeoutMultiplier = MAXDWORD
-	timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1
+	//timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1
+	if constTimeout == 0 {
+		timeouts.ReadTotalTimeoutConstant = MAXDWORD - 1
+	} else {
+		timeouts.ReadTotalTimeoutConstant = uint32(constTimeout * 1000.0)
+	}
 
 	/* From http://msdn.microsoft.com/en-us/library/aa363190(v=VS.85).aspx
 
@@ -285,11 +304,9 @@ func getOverlappedResult(h syscall.Handle, overlapped *syscall.Overlapped) (int,
 	if r == 0 {
 		return n, err
 	}
-
+	//fmt.Printf("n %d  err %v\n", n, err)
 	return n, nil
 }
-
-
 
 func (sp *serialPort) SetMode(baudrate, databits, parity, stopbits, handshake int) error {
 	if err := setCommState(syscall.Handle(sp.f.Fd()), baudrate, databits, parity, handshake); err != nil {
@@ -300,5 +317,17 @@ func (sp *serialPort) SetMode(baudrate, databits, parity, stopbits, handshake in
 }
 
 func (sp *serialPort) SetReadParams(minread int, timeout float64) error {
-	return StringError("SetReadParams not implemented yet on Windows")
+	// TODO: minread is ignored!
+	return setCommTimeouts(sp.fd, timeout)
+	//return StringError("SetReadParams not implemented yet on Windows")
+}
+
+type winSersTimeout struct{}
+
+func (wst winSersTimeout) Error() string {
+	return "a timeout has occured"
+}
+
+func (wst winSersTimeout) Timeout() bool {
+	return true
 }
