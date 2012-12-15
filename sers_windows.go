@@ -6,6 +6,11 @@ package sers
 // and slightly modified
 
 // (C) 2011, 2012 Tarmigan Casebolt, Benjamin Siegert, Michael Meier
+// All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
+
+
 
 import (
 	"fmt"

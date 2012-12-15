@@ -1,3 +1,7 @@
+// Copyright 2012 Michael Meier. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
+
 // Package sers offers serial port access. It is a stated goal of this
 // package to allow for non-standard bit rates as the may be useful
 // in a wide range of embedded projects.
