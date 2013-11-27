@@ -7,7 +7,6 @@
 // in a wide range of embedded projects.
 package sers
 
-import "C"
 
 import (
 	"fmt"
