@@ -17,13 +17,14 @@ package sers
 import "C"
 
 import (
+	"io"
 	"os"
 	"syscall"
 	"unsafe"
 )
 
 const (
-	// using C.IOSSIOSPEED yields 0x80085402 
+	// using C.IOSSIOSPEED yields 0x80085402
 	// which does not work. don't ask me why
 	// this define is wrong in cgo.
 	IOSSIOSPEED = 0x80045402
@@ -55,7 +56,13 @@ func TakeOver(f *os.File) (SerialPort, error) {
 }
 
 func (bp *baseport) Read(b []byte) (int, error) {
-	return bp.f.Read(b)
+	n, err := bp.f.Read(b)
+
+	// timeout gets reported as EOF
+	if err == io.EOF {
+		err = termiosSersTimeout{}
+	}
+	return n, err
 }
 
 func (b *baseport) Close() error {
@@ -215,4 +222,14 @@ func Open(fn string) (SerialPort, error) {
 	}
 
 	return s, nil
+}
+
+type termiosSersTimeout struct{}
+
+func (tst termiosSersTimeout) Error() string {
+	return "timeout"
+}
+
+func (tst termiosSersTimeout) Timeout() bool {
+	return true
 }
