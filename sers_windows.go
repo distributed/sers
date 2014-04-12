@@ -10,8 +10,6 @@ package sers
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-
-
 import (
 	"fmt"
 	"os"
@@ -46,6 +44,16 @@ type structTimeouts struct {
 	WriteTotalTimeoutConstant   uint32
 }
 
+type opError struct {
+	op       string
+	filename string
+	err      error
+}
+
+func (o opError) Error() string {
+	return o.op + " " + o.filename + ": " + o.err.Error()
+}
+
 //func openPort(name string) (rwc io.ReadWriteCloser, err error) { // TODO
 func Open(name string) (rwc SerialPort, err error) {
 	if len(name) > 0 && name[0] != '\\' {
@@ -60,7 +68,7 @@ func Open(name string) (rwc SerialPort, err error) {
 		syscall.FILE_ATTRIBUTE_NORMAL|syscall.FILE_FLAG_OVERLAPPED,
 		0)
 	if err != nil {
-		return nil, err
+		return nil, opError{"open", name, err}
 	}
 	f := os.NewFile(uintptr(h), name)
 	defer func() {
