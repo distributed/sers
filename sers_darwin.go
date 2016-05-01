@@ -7,7 +7,7 @@ package sers
 // license that can be found in the LICENSE file.
 
 /*#include <sys/ioctl.h>
-#include <IOKit/serial/ioss.h> 
+#include <IOKit/serial/ioss.h>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -29,7 +29,7 @@ func (bp *baseport) SetBaudRate(br int) error {
 
 	ret, err := C.ioctl1(C.int(bp.f.Fd()), C.uint(IOSSIOSPEED), unsafe.Pointer(&speed))
 	if ret == -1 || err != nil {
-		return err
+		return &Error{"setting baud rate: ioctl", err}
 	}
 
 	return nil

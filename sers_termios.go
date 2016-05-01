@@ -143,7 +143,7 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 
 	tio, err := bp.getattr()
 	if err != nil {
-		return err
+		return &Error{"getattr", err}
 	}
 
 	tio.c_cflag &^= C.CSIZE
@@ -159,7 +159,7 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	tio.c_cflag |= C.tcflag_t(flowmask)
 
 	if err := bp.setattr(tio); err != nil {
-		return err
+		return &Error{"setattr", err}
 	}
 
 	if err := bp.SetBaudRate(baudrate); err != nil {
@@ -182,7 +182,7 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 
 	tio, err := bp.getattr()
 	if err != nil {
-		return err
+		return &Error{"getattr", err}
 	}
 
 	tio.c_cc[C.VMIN] = C.cc_t(minread)
@@ -192,7 +192,7 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 
 	err = bp.setattr(tio)
 	if err != nil {
-		return err
+		return &Error{"setattr", err}
 	}
 
 	return nil
