@@ -27,7 +27,7 @@ func (bp *baseport) SetBaudRate(br int) error {
 	}
 
 	// using aliased baudrate
-	C.cfsetspeed(tio, C.B38400)
+	//C.cfsetspeed(tio, C.B38400)
 
 	err = bp.setattr(tio)
 	if err != nil {
