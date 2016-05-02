@@ -1,20 +1,23 @@
-#include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <linux/serial.h>
 #include <linux/ioctl.h>
 #include <asm-generic/ioctls.h>
+#include <asm/termios.h>
 
 int setbaudrate(int fd, int br) {
-  struct serial_struct ss;
+	struct termios2 tio;
+	int ret;
+	
+	ret = ioctl(fd, TCGETS2, &tio);
+	if (ret == -1) return ret;
 
-  int ret = ioctl(fd, TIOCGSERIAL, &ss);
-  if (ret < 0) return ret;
-
-  ss.flags = (ss.flags & (~ASYNC_SPD_MASK)) | ASYNC_SPD_CUST;
-  ss.custom_divisor = (ss.baud_base + (br/2)) / br;
-  
-  return ioctl(fd, TIOCSSERIAL, &ss);
+	tio.c_cflag &= ~CBAUD;
+	tio.c_cflag |= BOTHER;
+	tio.c_ispeed = br;
+	tio.c_ospeed = br;
+	
+	return ioctl(fd, TCSETS2, &tio);
 }
 
 int clearnonblocking(int fd) {
