@@ -17,6 +17,7 @@ package sers
 import "C"
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"syscall"
@@ -193,6 +194,23 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 	err = bp.setattr(tio)
 	if err != nil {
 		return &Error{"setattr", err}
+	}
+
+	return nil
+}
+
+func (bp *baseport) SetBreak(on bool) error {
+	var (
+		op       C.uint = C.TIOCCBRK
+		opstring string = "setting break"
+	)
+	if on {
+		op, opstring = C.TIOCSBRK, "clearing break"
+	}
+
+	_, err := C.ioctl1(C.int(bp.f.Fd()), op, unsafe.Pointer(&on))
+	if err != nil {
+		return &Error{fmt.Sprintf("ioctl: %s", opstring), err}
 	}
 
 	return nil

@@ -1,4 +1,5 @@
 #include <sys/ioctl.h>
+#include <fcntl.h>
 
 int ioctl1(int i, unsigned int r, void *d) {
     return ioctl(i, r, d);

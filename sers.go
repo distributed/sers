@@ -25,7 +25,8 @@ const (
 )
 
 // Serialport represents a serial port and offers configuration of baud
-// rate, frame format, handshaking and read paramters.
+// rate, frame format, handshaking and read paramters as well as setting and
+// clearing break conditions.
 type SerialPort interface {
 	io.Reader
 	io.Writer
@@ -43,6 +44,10 @@ type SerialPort interface {
 	// timeout in seconds. These parameters roughly correspond to the
 	// UNIX termios concepts of VMIN and VTIME.
 	SetReadParams(minread int, timeout float64) error
+
+	// SetBreak turns on the generation of a break condition if on == true,
+	// otherwise it clear the break condition.
+	SetBreak(on bool) error
 }
 
 type StringError string
