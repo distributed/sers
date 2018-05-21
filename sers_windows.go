@@ -158,6 +158,28 @@ func (p *serialPort) Read(buf []byte) (int, error) {
 	return n, err
 }
 
+func (p *serialPort) SetBreak(on bool) error {
+	var opstring string = "ClearCommBreak"
+	if on {
+		opstring = "SetCommBreak"
+	}
+
+	var (
+		r1  uintptr
+		err error
+	)
+	if on {
+		r1, _, err = syscall.Syscall(nSetCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+	} else {
+		r1, _, err = syscall.Syscall(nClearCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+	}
+	if r1 == 0 {
+		return &Error{opstring, err}
+	}
+
+	return nil
+}
+
 var (
 	nSetCommState,
 	nSetCommTimeouts,
@@ -165,7 +187,9 @@ var (
 	nSetupComm,
 	nGetOverlappedResult,
 	nCreateEvent,
-	nResetEvent uintptr
+	nResetEvent,
+	nSetCommBreak,
+	nClearCommBreak uintptr
 )
 
 func init() {
@@ -182,6 +206,8 @@ func init() {
 	nGetOverlappedResult = getProcAddr(k32, "GetOverlappedResult")
 	nCreateEvent = getProcAddr(k32, "CreateEventW")
 	nResetEvent = getProcAddr(k32, "ResetEvent")
+	nSetCommBreak = getProcAddr(k32, "SetCommBreak")
+	nClearCommBreak = getProcAddr(k32, "ClearCommBreak")
 }
 
 func getProcAddr(lib syscall.Handle, name string) uintptr {
