@@ -25,20 +25,11 @@ func (bp *baseport) SetBaudRate(br int) error {
 	var speed C.speed_t = C.speed_t(br)
 
 	//fmt.Printf("C.IOSSIOSPEED %x\n", uint64(C.IOSSIOSPEED))
-	//fmt.Printf("for file %v, fd %d\n", bp.f, bp.f.Fd())
+	//fmt.Printf("for file %v, fd %d\n", bp.f, bp.fd)
 
-	ret, err := C.ioctl1(C.int(bp.f.Fd()), C.uint(IOSSIOSPEED), unsafe.Pointer(&speed))
+	ret, err := C.ioctl1(C.int(bp.fd), C.uint(IOSSIOSPEED), unsafe.Pointer(&speed))
 	if ret == -1 || err != nil {
 		return &Error{"setting baud rate: ioctl", err}
-	}
-
-	return nil
-}
-
-func (bp *baseport) ClearNonBlocking() error {
-	res, err := C.fcntl1(C.int(bp.f.Fd()), C.F_SETFL, 0)
-	if res < 0 || err != nil {
-		return err
 	}
 
 	return nil

@@ -32,14 +32,14 @@ const (
 )
 
 type baseport struct {
-	f *os.File
+	fd int
+	f  *os.File
 }
 
-func TakeOver(f *os.File) (SerialPort, error) {
-	if f == nil {
-		return nil, &ParameterError{"f", "needs to be non-nil"}
+func takeOverFD(fd int, fn string) (SerialPort, error) {
+	bp := &baseport{
+		fd: fd,
 	}
-	bp := &baseport{f}
 
 	tio, err := bp.getattr()
 	if err != nil {
@@ -52,6 +52,23 @@ func TakeOver(f *os.File) (SerialPort, error) {
 	if err != nil {
 		return nil, &Error{"putting fd in non-canonical mode", err}
 	}
+
+	bp.f = os.NewFile(uintptr(fd), fn)
+
+	return bp, nil
+}
+
+// TakeOver accepts an open *os.File and returns a SerialPort representing the
+// open file.
+//
+// Attention: This calls the .Fd() method of the *os.File and thus renders the
+// deadline functionality unusable. Furthermore blocked readers may remain
+// stuck after a Close() if no data arrives.
+func TakeOver(f *os.File) (SerialPort, error) {
+	if f == nil {
+		return nil, &ParameterError{"f", "needs to be non-nil"}
+	}
+	bp := &baseport{int(f.Fd()), f}
 
 	return bp, nil
 }
@@ -76,7 +93,7 @@ func (bp *baseport) Write(b []byte) (int, error) {
 
 func (bp *baseport) getattr() (*C.struct_termios, error) {
 	var tio C.struct_termios
-	res, err := C.tcgetattr(C.int(bp.f.Fd()), (*C.struct_termios)(unsafe.Pointer(&tio)))
+	res, err := C.tcgetattr(C.int(bp.fd), (*C.struct_termios)(unsafe.Pointer(&tio)))
 	if res != 0 || err != nil {
 		return nil, err
 	}
@@ -85,7 +102,7 @@ func (bp *baseport) getattr() (*C.struct_termios, error) {
 }
 
 func (bp *baseport) setattr(tio *C.struct_termios) error {
-	res, err := C.tcsetattr(C.int(bp.f.Fd()), C.TCSANOW, (*C.struct_termios)(unsafe.Pointer(tio)))
+	res, err := C.tcsetattr(C.int(bp.fd), C.TCSANOW, (*C.struct_termios)(unsafe.Pointer(tio)))
 	if res != 0 || err != nil {
 		return err
 	}
@@ -208,7 +225,7 @@ func (bp *baseport) SetBreak(on bool) error {
 		op, opstring = C.TIOCSBRK, "clearing break"
 	}
 
-	_, err := C.ioctl1(C.int(bp.f.Fd()), op, unsafe.Pointer(&on))
+	_, err := C.ioctl1(C.int(bp.fd), op, unsafe.Pointer(&on))
 	if err != nil {
 		return &Error{fmt.Sprintf("ioctl: %s", opstring), err}
 	}
@@ -220,23 +237,17 @@ func Open(fn string) (SerialPort, error) {
 	// the order of system calls is taken from Apple's SerialPortSample
 	// open the TTY device read/write, nonblocking, i.e. not waiting
 	// for the CARRIER signal and without the TTY controlling the process
-	f, err := os.OpenFile(fn, syscall.O_RDWR|
-		syscall.O_NONBLOCK|
-		syscall.O_NOCTTY, 0666)
+	fd, err := syscall.Open(fn, syscall.O_RDWR|
+		syscall.O_NOCTTY|
+		syscall.O_NONBLOCK,
+		0666)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open %s: %v", fn, err)
 	}
 
-	s, err := TakeOver(f)
+	s, err := takeOverFD(fd, fn)
 	if err != nil {
 		return nil, err
-	}
-
-	// clear non-blocking mode
-	err = s.(*baseport).ClearNonBlocking()
-	if err != nil {
-		f.Close()
-		return nil, &Error{"putting fd into non-blocking mode", err}
 	}
 
 	return s, nil

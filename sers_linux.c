@@ -132,7 +132,3 @@ int setbaudrate(int fd, int br) {
 	
 	return ioctl(fd, TCSETS3, &tio);
 }
-
-int clearnonblocking(int fd) {
-  return fcntl(fd, F_SETFL, 0);
-}

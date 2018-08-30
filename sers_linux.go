@@ -16,15 +16,10 @@ import "C"
 
 func (bp *baseport) SetBaudRate(br int) error {
 	// setting baud rate via new struct termios2 method 
-	_, err := C.setbaudrate(C.int(bp.f.Fd()), C.int(br))
+	_, err := C.setbaudrate(C.int(bp.fd), C.int(br))
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (bp *baseport) ClearNonBlocking() error {
-	_, err := C.clearnonblocking(C.int(bp.f.Fd()))
-	return err
 }
