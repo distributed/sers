@@ -120,7 +120,6 @@ int setbaudrate(int fd, int br) {
 	int ret;
 
 	ret = ioctl(fd, TCGETS2, &tio);
-	printf("ret %d errno %d strerror %s\n", ret, errno, strerror(errno));
 	if (ret == -1) return ret;
 
 	tio.c_cflag &= ~CBAUD;
