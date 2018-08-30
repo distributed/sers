@@ -39,7 +39,7 @@ pretty much every platform that is not x86_64. Maybe nobody ever noticed?
 #define NCCS_K NCCS
 #endif
 /* extended termios struct for custom baud rate */
-struct termios2 {
+struct termios3 {
 	tcflag_t c_iflag;		/* input mode flags */
 	tcflag_t c_oflag;		/* output mode flags */
 	tcflag_t c_cflag;		/* control mode flags */
@@ -49,6 +49,9 @@ struct termios2 {
 	speed_t c_ispeed;		/* input speed */
 	speed_t c_ospeed;		/* output speed */
 };
+
+#define TCGETS3 _IOR('T', 0x2A, struct termios3)
+#define TCSETS3 _IOW('T', 0x2B, struct termios3)
 
 #include <stdio.h>
 #include <errno.h>
@@ -116,10 +119,10 @@ int setbaudrate(int fd, int br) {
 
 	// if we have a custom baud rate, we use our own cobbled together approach.
 
-	struct termios2 tio;
+	struct termios3 tio;
 	int ret;
 
-	ret = ioctl(fd, TCGETS2, &tio);
+	ret = ioctl(fd, TCGETS3, &tio);
 	if (ret == -1) return ret;
 
 	tio.c_cflag &= ~CBAUD;
@@ -127,7 +130,7 @@ int setbaudrate(int fd, int br) {
 	tio.c_ispeed = br;
 	tio.c_ospeed = br;
 	
-	return ioctl(fd, TCSETS2, &tio);
+	return ioctl(fd, TCSETS3, &tio);
 }
 
 int clearnonblocking(int fd) {
