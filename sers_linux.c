@@ -32,9 +32,9 @@ pretty much every platform that is not x86_64. Maybe nobody ever noticed?
 
 #if NCCS == 32
 // i have not seen a platform with NCCS == 32 in the kernel header files. i saw
-// NCCS == 32 On My Machine where it should have been 23, so we're using that.
-// Getting this wrong will most likely in a ioctl that returns an error.
-#define NCCS_K 23
+// NCCS == 32 On My Machine where it should have been 19, so we're using that.
+// Getting this wrong will most likely result in a ioctl that returns an error.
+#define NCCS_K 19
 #else
 #define NCCS_K NCCS
 #endif
