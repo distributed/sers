@@ -7,10 +7,10 @@
 // in a wide range of embedded projects.
 package sers
 
-
 import (
 	"fmt"
 	"io"
+	"time"
 )
 
 const (
@@ -48,6 +48,35 @@ type SerialPort interface {
 	// SetBreak turns on the generation of a break condition if on == true,
 	// otherwise it clear the break condition.
 	SetBreak(on bool) error
+
+	// SetDeadline sets the read and write deadlines associated
+	// with the connection. It is equivalent to calling both
+	// SetReadDeadline and SetWriteDeadline.
+	//
+	// A deadline is an absolute time after which I/O operations
+	// fail with a timeout (see type Error) instead of
+	// blocking. The deadline applies to all future and pending
+	// I/O, not just the immediately following call to ReadFrom or
+	// WriteTo. After a deadline has been exceeded, the connection
+	// can be refreshed by setting a deadline in the future.
+	//
+	// An idle timeout can be implemented by repeatedly extending
+	// the deadline after successful ReadFrom or WriteTo calls.
+	//
+	// A zero value for t means I/O operations will not time out.
+	SetDeadline(t time.Time) error
+
+	// SetReadDeadline sets the deadline for future ReadFrom calls
+	// and any currently-blocked ReadFrom call.
+	// A zero value for t means ReadFrom will not time out.
+	SetReadDeadline(t time.Time) error
+
+	// SetWriteDeadline sets the deadline for future WriteTo calls
+	// and any currently-blocked WriteTo call.
+	// Even if write times out, it may return n > 0, indicating that
+	// some of the data was successfully written.
+	// A zero value for t means WriteTo will not time out.
+	SetWriteDeadline(t time.Time) error
 }
 
 type StringError string

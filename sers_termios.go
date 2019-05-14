@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -232,6 +233,10 @@ func (bp *baseport) SetBreak(on bool) error {
 
 	return nil
 }
+
+func (bp *baseport) SetDeadline(t time.Time) error      { return bp.f.SetDeadline(t) }
+func (bp *baseport) SetReadDeadline(t time.Time) error  { return bp.f.SetReadDeadline(t) }
+func (bp *baseport) SetWriteDeadline(t time.Time) error { return bp.f.SetWriteDeadline(t) }
 
 func Open(fn string) (SerialPort, error) {
 	// the order of system calls is taken from Apple's SerialPortSample

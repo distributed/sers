@@ -15,6 +15,7 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -169,9 +170,9 @@ func (p *serialPort) SetBreak(on bool) error {
 		err error
 	)
 	if on {
-		r1, _, err = syscall.Syscall(nSetCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+		r1, _, err = syscall.Syscall(nSetCommBreak, 1, uintptr(p.fd), 0, 0)
 	} else {
-		r1, _, err = syscall.Syscall(nClearCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+		r1, _, err = syscall.Syscall(nClearCommBreak, 1, uintptr(p.fd), 0, 0)
 	}
 	if r1 == 0 {
 		return &Error{opstring, err}
@@ -179,6 +180,10 @@ func (p *serialPort) SetBreak(on bool) error {
 
 	return nil
 }
+
+func (p *serialPort) SetDeadline(t time.Time) error      { return p.f.SetDeadline(t) }
+func (p *serialPort) SetReadDeadline(t time.Time) error  { return p.f.SetReadDeadline(t) }
+func (p *serialPort) SetWriteDeadline(t time.Time) error { return p.f.SetWriteDeadline(t) }
 
 var (
 	nSetCommState,
@@ -348,7 +353,7 @@ func getOverlappedResult(h syscall.Handle, overlapped *syscall.Overlapped) (int,
 }
 
 func (sp *serialPort) SetMode(baudrate, databits, parity, stopbits, handshake int) error {
-	if err := setCommState(syscall.Handle(sp.f.Fd()), baudrate, databits, parity, handshake); err != nil {
+	if err := setCommState(sp.fd, baudrate, databits, parity, handshake); err != nil {
 		return err
 	}
 	//return StringError("SetMode not implemented yet on Windows")
