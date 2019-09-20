@@ -47,7 +47,7 @@ type SerialPort interface {
 	// before. If not, it returns an error.
 	GetMode() (Mode, error)
 
-	// SetReadParams sets the minimum number of bits to read and a read
+	// SetReadParams sets the minimum number of bytes to read and a read
 	// timeout in seconds. These parameters roughly correspond to the
 	// UNIX termios concepts of VMIN and VTIME.
 	SetReadParams(minread int, timeout float64) error
