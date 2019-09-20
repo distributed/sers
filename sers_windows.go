@@ -182,6 +182,7 @@ func (p *serialPort) SetBreak(on bool) error {
 
 var (
 	nSetCommState,
+	nGetCommState,
 	nSetCommTimeouts,
 	nSetCommMask,
 	nSetupComm,
@@ -200,6 +201,7 @@ func init() {
 	defer syscall.FreeLibrary(k32)
 
 	nSetCommState = getProcAddr(k32, "SetCommState")
+	nGetCommState = getProcAddr(k32, "GetCommState")
 	nSetCommTimeouts = getProcAddr(k32, "SetCommTimeouts")
 	nSetCommMask = getProcAddr(k32, "SetCommMask")
 	nSetupComm = getProcAddr(k32, "SetupComm")
@@ -218,19 +220,19 @@ func getProcAddr(lib syscall.Handle, name string) uintptr {
 	return addr
 }
 
-func setCommState(h syscall.Handle, baud, databits, parity, handshake int) error {
+func setCommState(h syscall.Handle, mode Mode) error {
 	var params structDCB
 	params.DCBlength = uint32(unsafe.Sizeof(params))
 
 	params.flags[0] = 0x01  // fBinary
 	params.flags[0] |= 0x10 // Assert DSR
 
-	params.ByteSize = byte(databits)
+	params.ByteSize = byte(mode.DataBits)
 
-	params.BaudRate = uint32(baud)
+	params.BaudRate = uint32(mode.Baudrate)
 	//params.ByteSize = 8
 
-	switch parity {
+	switch mode.Parity {
 	case N:
 		params.flags[0] &^= 0x02
 		params.Parity = 0 // NOPARITY
@@ -244,11 +246,11 @@ func setCommState(h syscall.Handle, baud, databits, parity, handshake int) error
 		return StringError("invalid parity setting")
 	}
 
-	switch handshake {
+	switch mode.Handshake {
 	case NO_HANDSHAKE:
 		// TODO: reset handshake
 	default:
-		return StringError("only NO_HANDSHAKE is supported on windows")
+		return fmt.Errorf("setting mode %q: only NO_HANDSHAKE is supported on windows", mode)
 	}
 
 	r, _, err := syscall.Syscall(nSetCommState, 2, uintptr(h), uintptr(unsafe.Pointer(&params)), 0)
@@ -256,6 +258,39 @@ func setCommState(h syscall.Handle, baud, databits, parity, handshake int) error
 		return err
 	}
 	return nil
+}
+
+func (sp *serialPort) GetMode() (Mode, error) {
+	var params structDCB
+	var mode Mode = Mode{Handshake: NO_HANDSHAKE, Parity: N, Stopbits: 1}
+
+	r, _, err := syscall.Syscall(nGetCommState, 2, uintptr(syscall.Handle(sp.f.Fd())), uintptr(unsafe.Pointer(&params)), 0)
+	if r == 0 {
+		return mode, err
+	}
+
+	mode.DataBits = int(params.ByteSize)
+	if mode.DataBits > 8 {
+		return mode, fmt.Errorf("error getting mode: ByteSize > 8")
+	}
+
+	if mode.DataBits < 5 {
+		return mode, fmt.Errorf("error getting mode: ByteSize < 5")
+	}
+
+	mode.Baudrate = int(params.BaudRate)
+	if params.flags[0]&0x02 != 0 {
+		switch params.Parity {
+		case 1:
+			mode.Parity = O
+		case 2:
+			mode.Parity = E
+		default:
+			return mode, fmt.Errorf("error getting mode: unsupport Parity setting %d", params.Parity)
+		}
+	}
+
+	return mode, nil
 }
 
 func setCommTimeouts(h syscall.Handle, constTimeout float64) error {
@@ -348,7 +383,15 @@ func getOverlappedResult(h syscall.Handle, overlapped *syscall.Overlapped) (int,
 }
 
 func (sp *serialPort) SetMode(baudrate, databits, parity, stopbits, handshake int) error {
-	if err := setCommState(syscall.Handle(sp.f.Fd()), baudrate, databits, parity, handshake); err != nil {
+	mode := Mode{
+		Baudrate:  baudrate,
+		DataBits:  databits,
+		Parity:    parity,
+		Stopbits:  stopbits,
+		Handshake: handshake,
+	}
+
+	if err := setCommState(syscall.Handle(sp.f.Fd()), mode); err != nil {
 		return err
 	}
 	//return StringError("SetMode not implemented yet on Windows")

@@ -13,13 +13,28 @@ package sers
 #include <unistd.h>
 #include <fcntl.h>
 
+
  extern int fcntl1(int i, unsigned int r, unsigned int d);
  extern int ioctl1(int i, unsigned int r, void *d);*/
 import "C"
 
 import (
+	"sync"
 	"unsafe"
 )
+
+const (
+	// using C.IOSSIOSPEED yields 0x80085402
+	// which does not work. don't ask me why
+	// this define is wrong in cgo.
+	IOSSIOSPEED = 0x80045402
+)
+
+type termiosPlatformData struct {
+	lock        sync.Mutex
+	baudrateSet bool
+	baudrate    int
+}
 
 func (bp *baseport) SetBaudRate(br int) error {
 	var speed C.speed_t = C.speed_t(br)
@@ -32,5 +47,27 @@ func (bp *baseport) SetBaudRate(br int) error {
 		return &Error{"setting baud rate: ioctl", err}
 	}
 
+	bp.platformData.lock.Lock()
+	bp.platformData.baudrate = br
+	bp.platformData.baudrateSet = true
+	bp.platformData.lock.Unlock()
+
 	return nil
+}
+
+type osxBaudrateRetrievalFailed struct{}
+
+func (osxBaudrateRetrievalFailed) Error() string {
+	return "sers: Cannot get current baud rate setting. You have to set the baudrate through SetMode before you can read it via GetMode. See documentation."
+}
+
+func (bp *baseport) getBaudrate() (int, error) {
+	bp.platformData.lock.Lock()
+	defer bp.platformData.lock.Unlock()
+
+	if bp.platformData.baudrateSet {
+		return bp.platformData.baudrate, nil
+	}
+
+	return -1, osxBaudrateRetrievalFailed{}
 }

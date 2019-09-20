@@ -7,7 +7,6 @@
 // in a wide range of embedded projects.
 package sers
 
-
 import (
 	"fmt"
 	"io"
@@ -38,7 +37,15 @@ type SerialPort interface {
 	// supported by the driver. parity is one of (N|O|E) for none, odd
 	// or even parity. handshake is either NO_HANDSHAKE or
 	// RTSCTS_HANDSHAKE.
+	//
+	// Known bug on Windows: Only NO_HANDSHAKE is supported.
 	SetMode(baudrate, databits, parity, stopbits, handshake int) error
+
+	// GetMode retrieves the current mode settings.
+	//
+	// Known bug on OS X: GetMode only works after SetMode has been called
+	// before. If not, it returns an error.
+	GetMode() (Mode, error)
 
 	// SetReadParams sets the minimum number of bits to read and a read
 	// timeout in seconds. These parameters roughly correspond to the
@@ -135,7 +142,7 @@ type ParameterError struct {
 }
 
 func (pe *ParameterError) Error() string {
-	return fmt.Sprintf("error in parameter '%s': %s")
+	return fmt.Sprintf("error in parameter '%s': %s", pe.Parameter, pe.Reason)
 }
 
 type Error struct {

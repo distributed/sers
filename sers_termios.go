@@ -24,16 +24,10 @@ import (
 	"unsafe"
 )
 
-const (
-	// using C.IOSSIOSPEED yields 0x80085402
-	// which does not work. don't ask me why
-	// this define is wrong in cgo.
-	IOSSIOSPEED = 0x80045402
-)
-
 type baseport struct {
-	fd int
-	f  *os.File
+	fd           int
+	f            *os.File
+	platformData termiosPlatformData
 }
 
 func takeOverFD(fd int, fn string) (SerialPort, error) {
@@ -68,7 +62,7 @@ func TakeOver(f *os.File) (SerialPort, error) {
 	if f == nil {
 		return nil, &ParameterError{"f", "needs to be non-nil"}
 	}
-	bp := &baseport{int(f.Fd()), f}
+	bp := &baseport{fd: int(f.Fd()), f: f}
 
 	return bp, nil
 }
@@ -185,6 +179,53 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	}
 
 	return nil
+}
+
+func (bp *baseport) GetMode() (mode Mode, err error) {
+	var tio *C.struct_termios
+	tio, err = bp.getattr()
+	if err != nil {
+		return
+	}
+
+	tioCharSize := tio.c_cflag & C.CSIZE
+	switch tioCharSize {
+	case C.CS5:
+		mode.DataBits = 5
+	case C.CS6:
+		mode.DataBits = 6
+	case C.CS7:
+		mode.DataBits = 7
+	case C.CS8:
+		mode.DataBits = 8
+	default:
+		err = fmt.Errorf("unknown character size field (%#08x) in termios", tioCharSize)
+	}
+
+	mode.Stopbits = 1
+	if tio.c_cflag&C.CSTOPB != 0 {
+		mode.Stopbits = 2
+	}
+
+	mode.Parity = N
+	switch tio.c_cflag & (C.PARENB | C.PARODD) {
+	case C.PARENB | C.PARODD:
+		mode.Parity = O
+	case C.PARENB:
+		mode.Parity = E
+	}
+
+	mode.Handshake = NO_HANDSHAKE
+	if tio.c_cflag&C.CRTSCTS != 0 {
+		mode.Handshake = RTSCTS_HANDSHAKE
+	}
+
+	mode.Baudrate, err = bp.getBaudrate()
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 func (bp *baseport) SetReadParams(minread int, timeout float64) error {
