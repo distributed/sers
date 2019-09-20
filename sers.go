@@ -50,6 +50,79 @@ type SerialPort interface {
 	SetBreak(on bool) error
 }
 
+func SetModeStruct(sp SerialPort, mode Mode) error {
+	return sp.SetMode(mode.Baudrate, mode.DataBits, mode.Parity, mode.Stopbits, mode.Handshake)
+
+}
+
+type Mode struct {
+	Baudrate  int
+	DataBits  int
+	Parity    int
+	Stopbits  int
+	Handshake int
+}
+
+func (m Mode) Valid() bool {
+	if m.Baudrate < 0 {
+		return false
+	}
+	if m.DataBits < 5 || m.DataBits > 8 {
+		return false
+	}
+	if !(m.Parity == N || m.Parity == O || m.Parity == E) {
+		return false
+	}
+	if !(m.Stopbits == 1 || m.Stopbits == 2) {
+		return false
+	}
+	if !(m.Handshake == NO_HANDSHAKE || m.Handshake == RTSCTS_HANDSHAKE) {
+		return false
+	}
+
+	return true
+}
+
+func (m Mode) String() string {
+	if !m.Valid() {
+		return fmt.Sprintf("invalid_mode(%d,%d,%d,%d,%d)",
+			m.Baudrate,
+			m.DataBits,
+			m.Parity,
+			m.Stopbits,
+			m.Handshake)
+	}
+
+	parstring := ""
+	switch m.Parity {
+	case N:
+		parstring = "n"
+	case O:
+		parstring = "o"
+	case E:
+		parstring = "e"
+	default:
+		panic("unhandled parity setting")
+	}
+
+	hsstring := ""
+	switch m.Handshake {
+	case NO_HANDSHAKE:
+		hsstring = "none"
+	case RTSCTS_HANDSHAKE:
+		hsstring = "rtscts"
+	default:
+		panic("unhandled handshake setting")
+	}
+
+	return fmt.Sprintf("%d,%d%s%d,%s",
+		m.Baudrate,
+		m.DataBits,
+		parstring,
+		m.Stopbits,
+		hsstring)
+}
+
 type StringError string
 
 func (se StringError) Error() string {
