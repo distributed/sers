@@ -39,7 +39,7 @@ Due to backwards compatibility there is a difference in data representation
 between `SetMode` and `GetMode`.
 
 
-Platforms 
+Platforms
 ---------
 
 `sers` has been successfully used on Mac OS X, Linux and Windows.
@@ -104,11 +104,12 @@ not backwards compatible.
 Release History
 ---------------
 
-### untagged
+### v1.1.0
 
 - add `GetMode()` to `SerialPort`
 - add modestrings, `ParseModestring`
 - add `Mode` struct
+- add a more detailed `README.md`
 
 ### v1.0.2
 
