@@ -1,4 +1,4 @@
-// +build darwin linux
+// +build linux android
 
 package sers
 
@@ -6,22 +6,13 @@ package sers
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-/*#include <stddef.h>
-#include <stdlib.h>
-#include <termios.h>
-#include <sys/ioctl.h>
-
-
- extern int ioctl1(int i, unsigned int r, void *d);
-*/
-import "C"
-
 import (
 	"fmt"
 	"io"
 	"os"
 	"syscall"
-	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 type baseport struct {
@@ -40,7 +31,7 @@ func takeOverFD(fd int, fn string) (SerialPort, error) {
 		return nil, &Error{"putting fd in non-canonical mode", err}
 	}
 
-	C.cfmakeraw(tio)
+	cfmakeraw(tio)
 
 	err = bp.setattr(tio)
 	if err != nil {
@@ -85,25 +76,6 @@ func (bp *baseport) Write(b []byte) (int, error) {
 	return bp.f.Write(b)
 }
 
-func (bp *baseport) getattr() (*C.struct_termios, error) {
-	var tio C.struct_termios
-	res, err := C.tcgetattr(C.int(bp.fd), (*C.struct_termios)(unsafe.Pointer(&tio)))
-	if res != 0 || err != nil {
-		return nil, err
-	}
-
-	return &tio, nil
-}
-
-func (bp *baseport) setattr(tio *C.struct_termios) error {
-	res, err := C.tcsetattr(C.int(bp.fd), C.TCSANOW, (*C.struct_termios)(unsafe.Pointer(tio)))
-	if res != 0 || err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int) error {
 	if baudrate <= 0 {
 		return &ParameterError{"baudrate", "has to be > 0"}
@@ -112,13 +84,13 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	var datamask uint
 	switch databits {
 	case 5:
-		datamask = C.CS5
+		datamask = unix.CS5
 	case 6:
-		datamask = C.CS6
+		datamask = unix.CS6
 	case 7:
-		datamask = C.CS7
+		datamask = unix.CS7
 	case 8:
-		datamask = C.CS8
+		datamask = unix.CS8
 	default:
 		return &ParameterError{"databits", "has to be 5, 6, 7 or 8"}
 	}
@@ -128,7 +100,7 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	}
 	var stopmask uint
 	if stopbits == 2 {
-		stopmask = C.CSTOPB
+		stopmask = unix.CSTOPB
 	}
 
 	var parmask uint
@@ -136,9 +108,9 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	case N:
 		parmask = 0
 	case E:
-		parmask = C.PARENB
+		parmask = unix.PARENB
 	case O:
-		parmask = C.PARENB | C.PARODD
+		parmask = unix.PARENB | unix.PARODD
 	default:
 		return &ParameterError{"parity", "has to be N, E or O"}
 	}
@@ -148,7 +120,7 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 	case NO_HANDSHAKE:
 		flowmask = 0
 	case RTSCTS_HANDSHAKE:
-		flowmask = C.CRTSCTS
+		flowmask = unix.CRTSCTS
 	default:
 		return &ParameterError{"handshake", "has to be NO_HANDSHAKE or RTSCTS_HANDSHAKE"}
 	}
@@ -158,69 +130,79 @@ func (bp *baseport) SetMode(baudrate, databits, parity, stopbits, handshake int)
 		return &Error{"getattr", err}
 	}
 
-	tio.c_cflag &^= C.CSIZE
-	tio.c_cflag |= C.tcflag_t(datamask)
+	tio.Cflag &^= unix.CSIZE
+	tio.Cflag |= cflagtype(datamask)
 
-	tio.c_cflag &^= C.PARENB | C.PARODD
-	tio.c_cflag |= C.tcflag_t(parmask)
+	tio.Cflag &^= unix.PARENB | unix.PARODD
+	tio.Cflag |= cflagtype(parmask)
 
-	tio.c_cflag &^= C.CSTOPB
-	tio.c_cflag |= C.tcflag_t(stopmask)
+	tio.Cflag &^= unix.CSTOPB
+	tio.Cflag |= cflagtype(stopmask)
 
-	tio.c_cflag &^= C.CRTSCTS
-	tio.c_cflag |= C.tcflag_t(flowmask)
+	tio.Cflag &^= unix.CRTSCTS
+	tio.Cflag |= cflagtype(flowmask)
+
+	err = bp.fillBaudrate(tio, baudrate)
+	if err != nil {
+		return err
+	}
 
 	if err := bp.setattr(tio); err != nil {
 		return &Error{"setattr", err}
 	}
 
-	if err := bp.SetBaudRate(baudrate); err != nil {
+	/*if err := bp.SetBaudRate(baudrate); err != nil {
 		return err
-	}
+	}*/
 
 	return nil
 }
 
 func (bp *baseport) GetMode() (mode Mode, err error) {
-	var tio *C.struct_termios
+	var tio *unix.Termios
 	tio, err = bp.getattr()
 	if err != nil {
 		return
 	}
 
-	tioCharSize := tio.c_cflag & C.CSIZE
+	tioCharSize := tio.Cflag & unix.CSIZE
 	switch tioCharSize {
-	case C.CS5:
+	case unix.CS5:
 		mode.DataBits = 5
-	case C.CS6:
+	case unix.CS6:
 		mode.DataBits = 6
-	case C.CS7:
+	case unix.CS7:
 		mode.DataBits = 7
-	case C.CS8:
+	case unix.CS8:
 		mode.DataBits = 8
 	default:
 		err = fmt.Errorf("unknown character size field (%#08x) in termios", tioCharSize)
 	}
 
 	mode.Stopbits = 1
-	if tio.c_cflag&C.CSTOPB != 0 {
+	if tio.Cflag&unix.CSTOPB != 0 {
 		mode.Stopbits = 2
 	}
 
 	mode.Parity = N
-	switch tio.c_cflag & (C.PARENB | C.PARODD) {
-	case C.PARENB | C.PARODD:
+	switch tio.Cflag & (unix.PARENB | unix.PARODD) {
+	case unix.PARENB | unix.PARODD:
 		mode.Parity = O
-	case C.PARENB:
+	case unix.PARENB:
 		mode.Parity = E
 	}
 
 	mode.Handshake = NO_HANDSHAKE
-	if tio.c_cflag&C.CRTSCTS != 0 {
+	if tio.Cflag&unix.CRTSCTS != 0 {
 		mode.Handshake = RTSCTS_HANDSHAKE
 	}
 
-	mode.Baudrate, err = bp.getBaudrate()
+	/*mode.Baudrate, err = bp.getBaudrate()
+	if err != nil {
+		return
+	}*/
+	//panic("baud rate getting not yet supported")
+	mode.Baudrate, err = bp.extractBaudrate(tio)
 	if err != nil {
 		return
 	}
@@ -244,8 +226,8 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 		return &Error{"getattr", err}
 	}
 
-	tio.c_cc[C.VMIN] = C.cc_t(minread)
-	tio.c_cc[C.VTIME] = C.cc_t(inttimeout)
+	tio.Cc[unix.VMIN] = cctype(minread)
+	tio.Cc[unix.VTIME] = cctype(inttimeout)
 
 	//fmt.Printf("baud rates from termios: %d, %d\n", tio.c_ispeed, tio.c_ospeed)
 
@@ -259,14 +241,20 @@ func (bp *baseport) SetReadParams(minread int, timeout float64) error {
 
 func (bp *baseport) SetBreak(on bool) error {
 	var (
-		op       C.uint = C.TIOCCBRK
+		op       uint   = unix.TIOCCBRK
 		opstring string = "setting break"
 	)
 	if on {
-		op, opstring = C.TIOCSBRK, "clearing break"
+		op, opstring = unix.TIOCSBRK, "clearing break"
 	}
 
-	_, err := C.ioctl1(C.int(bp.fd), op, unsafe.Pointer(&on))
+	var onint int = 0
+	if on {
+		onint = 1
+	}
+
+	err := unix.IoctlSetInt(bp.fd, op, onint)
+
 	if err != nil {
 		return &Error{fmt.Sprintf("ioctl: %s", opstring), err}
 	}
@@ -302,4 +290,156 @@ func (tst termiosSersTimeout) Error() string {
 
 func (tst termiosSersTimeout) Timeout() bool {
 	return true
+}
+
+func cfmakeraw(tio *unix.Termios) {
+	tio.Iflag &^= (unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP |
+		unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON)
+	tio.Oflag &^= unix.OPOST
+	tio.Lflag &^= (unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN)
+	tio.Cflag &^= (unix.CSIZE | unix.PARENB)
+	tio.Cflag |= unix.CS8
+}
+
+// the baud rate enum functions can be shared across termios platforms.
+// they might be unused if a decent method for setting nontraditional baudrates
+// is available.
+
+func lookupbaudrate(br int) (cflagtype, error) {
+	switch br {
+	case 50:
+		return unix.B50, nil
+	case 75:
+		return unix.B75, nil
+	case 110:
+		return unix.B110, nil
+	case 134:
+		return unix.B134, nil
+	case 150:
+		return unix.B150, nil
+	case 200:
+		return unix.B200, nil
+	case 300:
+		return unix.B300, nil
+	case 600:
+		return unix.B600, nil
+	case 1200:
+		return unix.B1200, nil
+	case 1800:
+		return unix.B1800, nil
+	case 2400:
+		return unix.B2400, nil
+	case 4800:
+		return unix.B4800, nil
+	case 9600:
+		return unix.B9600, nil
+	case 19200:
+		return unix.B19200, nil
+	case 38400:
+		return unix.B38400, nil
+	case 57600:
+		return unix.B57600, nil
+	case 115200:
+		return unix.B115200, nil
+	case 230400:
+		return unix.B230400, nil
+	case 460800:
+		return unix.B460800, nil
+	case 500000:
+		return unix.B500000, nil
+	case 576000:
+		return unix.B576000, nil
+	case 921600:
+		return unix.B921600, nil
+	case 1000000:
+		return unix.B1000000, nil
+	case 1152000:
+		return unix.B1152000, nil
+	case 1500000:
+		return unix.B1500000, nil
+	case 2000000:
+		return unix.B2000000, nil
+	case 2500000:
+		return unix.B2500000, nil
+	case 3000000:
+		return unix.B3000000, nil
+	case 3500000:
+		return unix.B3500000, nil
+	case 4000000:
+		return unix.B4000000, nil
+	}
+
+	return 0, fmt.Errorf("unsupported baud rate %d (only traditional baud rates allowed)", br)
+}
+
+func speedtobaudrate(cflag cflagtype) (int, error) {
+	switch cflag & unix.CBAUD {
+	case unix.B50:
+		return 50, nil
+	case unix.B75:
+		return 75, nil
+	case unix.B110:
+		return 110, nil
+	case unix.B134:
+		return 134, nil
+	case unix.B150:
+		return 150, nil
+	case unix.B200:
+		return 200, nil
+	case unix.B300:
+		return 300, nil
+	case unix.B600:
+		return 600, nil
+	case unix.B1200:
+		return 1200, nil
+	case unix.B1800:
+		return 1800, nil
+	case unix.B2400:
+		return 2400, nil
+	case unix.B4800:
+		return 4800, nil
+	case unix.B9600:
+		return 9600, nil
+	case unix.B19200:
+		return 19200, nil
+	case unix.B38400:
+		return 38400, nil
+	case unix.B57600:
+		return 57600, nil
+	case unix.B115200:
+		return 115200, nil
+	case unix.B230400:
+		return 230400, nil
+	case unix.B460800:
+		return 460800, nil
+	case unix.B500000:
+		return 500000, nil
+	case unix.B576000:
+		return 576000, nil
+	case unix.B921600:
+		return 921600, nil
+	case unix.B1000000:
+		return 1000000, nil
+	case unix.B1152000:
+		return 1152000, nil
+	case unix.B1500000:
+		return 1500000, nil
+	case unix.B2000000:
+		return 2000000, nil
+	case unix.B2500000:
+		return 2500000, nil
+	case unix.B3000000:
+		return 3000000, nil
+	case unix.B3500000:
+		return 3500000, nil
+	case unix.B4000000:
+		return 4000000, nil
+	}
+
+	// if none of the above matched but we have CBAUDEX set
+	if cflag&unix.CBAUDEX != 0 {
+		return 0, fmt.Errorf("cannot read extended baud rate setting (sers without termios2 support)")
+	}
+
+	return 0, fmt.Errorf("unknown baud rate encoding (no enum for 0x%08x)", cflag)
 }
