@@ -1,3 +1,4 @@
+//go:build linux || android
 // +build linux android
 
 package sers
@@ -11,6 +12,7 @@ import (
 	"io"
 	"os"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -281,6 +283,10 @@ func Open(fn string) (SerialPort, error) {
 
 	return s, nil
 }
+
+func (bp *baseport) SetDeadline(t time.Time) error      { return bp.f.SetDeadline(t) }
+func (bp *baseport) SetReadDeadline(t time.Time) error  { return bp.f.SetReadDeadline(t) }
+func (bp *baseport) SetWriteDeadline(t time.Time) error { return bp.f.SetWriteDeadline(t) }
 
 type termiosSersTimeout struct{}
 
