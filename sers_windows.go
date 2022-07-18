@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package sers
@@ -169,9 +170,9 @@ func (p *serialPort) SetBreak(on bool) error {
 		err error
 	)
 	if on {
-		r1, _, err = syscall.Syscall(nSetCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+		r1, _, err = syscall.Syscall(nSetCommBreak, 1, uintptr(p.fd), 0, 0)
 	} else {
-		r1, _, err = syscall.Syscall(nClearCommBreak, 1, uintptr(p.f.Fd()), 0, 0)
+		r1, _, err = syscall.Syscall(nClearCommBreak, 1, uintptr(p.fd), 0, 0)
 	}
 	if r1 == 0 {
 		return &Error{opstring, err}
@@ -264,7 +265,7 @@ func (sp *serialPort) GetMode() (Mode, error) {
 	var params structDCB
 	var mode Mode = Mode{Handshake: NO_HANDSHAKE, Parity: N, Stopbits: 1}
 
-	r, _, err := syscall.Syscall(nGetCommState, 2, uintptr(syscall.Handle(sp.f.Fd())), uintptr(unsafe.Pointer(&params)), 0)
+	r, _, err := syscall.Syscall(nGetCommState, 2, uintptr(syscall.Handle(sp.fd)), uintptr(unsafe.Pointer(&params)), 0)
 	if r == 0 {
 		return mode, err
 	}
@@ -391,7 +392,7 @@ func (sp *serialPort) SetMode(baudrate, databits, parity, stopbits, handshake in
 		Handshake: handshake,
 	}
 
-	if err := setCommState(syscall.Handle(sp.f.Fd()), mode); err != nil {
+	if err := setCommState(syscall.Handle(sp.fd), mode); err != nil {
 		return err
 	}
 	//return StringError("SetMode not implemented yet on Windows")
